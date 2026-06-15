@@ -14,6 +14,6 @@ def single_bola_test(client_a, client_b, create_res, fetch_res):
         "target_id": target_id,
         "create_status": b_create_res.status_code,
         "attack_status": a_fetch_res.status_code,
-        "is_vulnerable": got_b_obj,
+        "is_vulnerable": bola_check,
     }
 
