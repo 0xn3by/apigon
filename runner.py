@@ -2,17 +2,33 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 from typing import Any
 
+from auth import login
 from checks import single_bola_test
 from client import build_client, make_create, make_fetch
-from config import Config
+from config import AuthSpec, Config, UserSpec
+
+
+def _build(config: Config, user: UserSpec):
+    """Build a client for one user, logging in first if credentials are given."""
+    if config.login and user.credentials:
+        token = login(
+            config.base_url,
+            config.login,
+            user.credentials,
+            timeout=config.timeout,
+            verify_tls=config.verify_tls,
+        )
+        user = replace(user, auth=AuthSpec(type="bearer", token=token))
+    return build_client(config.base_url, user, timeout=config.timeout, verify_tls=config.verify_tls)
 
 
 def run(config: Config) -> dict[str, Any]:
     """Wire up clients from config and execute one BOLA test."""
-    client_a = build_client(config.base_url, config.user_a, timeout=config.timeout, verify_tls=config.verify_tls)
-    client_b = build_client(config.base_url, config.user_b, timeout=config.timeout, verify_tls=config.verify_tls)
+    client_a = _build(config, config.user_a)
+    client_b = _build(config, config.user_b)
     try:
         return single_bola_test(
             client_a,
