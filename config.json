@@ -1,0 +1,30 @@
+{
+  "base_url": "https://api.example.com",
+  "timeout": 10,
+  "verify_tls": true,
+  "user_a": {
+    "auth": {
+      "type": "bearer",
+      "token": "${ATTACKER_TOKEN}"
+    },
+    "headers": {}
+  },
+  "user_b": {
+    "auth": {
+      "type": "bearer",
+      "token": "${VICTIM_TOKEN}"
+    },
+    "headers": {}
+  },
+  "create": {
+    "method": "POST",
+    "path": "/orders",
+    "json": {
+      "item": "demo"
+    }
+  },
+  "fetch": {
+    "method": "GET",
+    "path": "/orders/{id}"
+  }
+}
