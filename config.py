@@ -78,11 +78,25 @@ class AuthSpec:
 
 
 @dataclass
+class LoginSpec:
+    """How to exchange credentials for a token at the API's login endpoint."""
+
+    method: str = "POST"
+    path: str = "/auth/login"
+    token_field: str = "access_token"  # dot-path into the JSON response, e.g. "data.token"
+
+
+@dataclass
 class UserSpec:
-    """Per-user auth plus any extra static headers."""
+    """Per-user auth plus any extra static headers.
+
+    Either set `auth` (a token you already have) or `credentials` (used with the
+    top-level `login` spec to fetch a fresh token at runtime).
+    """
 
     auth: AuthSpec = field(default_factory=AuthSpec)
     headers: dict[str, str] = field(default_factory=dict)
+    credentials: dict[str, Any] | None = None
 
 
 @dataclass
@@ -102,6 +116,7 @@ class Config:
     user_b: UserSpec
     create: RequestSpec
     fetch: RequestSpec
+    login: LoginSpec | None = None
     timeout: float = 10.0
     verify_tls: bool = True
 
@@ -114,15 +129,18 @@ class Config:
             return UserSpec(
                 auth=AuthSpec(**d.get("auth", {})),
                 headers=d.get("headers", {}),
+                credentials=d.get("credentials"),
             )
 
         try:
+            login_raw = raw.get("login")
             return Config(
                 base_url=raw["base_url"].rstrip("/"),
                 user_a=_user(raw["user_a"]),
                 user_b=_user(raw["user_b"]),
                 create=RequestSpec(**raw["create"]),
                 fetch=RequestSpec(**raw["fetch"]),
+                login=LoginSpec(**login_raw) if login_raw else None,
                 timeout=float(raw.get("timeout", 10.0)),
                 verify_tls=bool(raw.get("verify_tls", True)),
             )
@@ -139,14 +157,17 @@ SAMPLE_CONFIG = {
     "base_url": "https://api.example.com",
     "timeout": 10,
     "verify_tls": True,
+    # apigon logs in with each user's credentials and reads the issued token.
+    # token_field is a dot-path into the login JSON response (e.g. "data.token").
+    "login": {"method": "POST", "path": "/auth/login", "token_field": "access_token"},
     "user_a": {
-        "auth": {"type": "bearer", "token": "${ATTACKER_TOKEN}"},
-        "headers": {},
+        "credentials": {"email": "${ATTACKER_EMAIL}", "password": "${ATTACKER_PASSWORD}"}
     },
     "user_b": {
-        "auth": {"type": "bearer", "token": "${VICTIM_TOKEN}"},
-        "headers": {},
+        "credentials": {"email": "${VICTIM_EMAIL}", "password": "${VICTIM_PASSWORD}"}
     },
+    # Alternatively, skip `login` and give each user a token you already have:
+    #   "user_a": {"auth": {"type": "bearer", "token": "${ATTACKER_TOKEN}"}}
     "create": {"method": "POST", "path": "/orders", "json": {"item": "demo"}},
     "fetch": {"method": "GET", "path": "/orders/{id}"},
 }
