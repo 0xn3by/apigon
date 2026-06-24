@@ -1,6 +1,6 @@
 # secrets — never commit (template lives in .env.example)
 .env
-
+.env.example
 # python
 __pycache__/
 *.pyc
