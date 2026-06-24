@@ -1,0 +1,2 @@
+bola pov.
+oracle problem
