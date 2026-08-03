@@ -1,12 +1,3 @@
-"""apigon — API authorization (BOLA) testing tool. CLI entry point.
-
-Run a test:
-    python3 main.py --config config.json
-
-Generate a starter config:
-    python3 main.py --init-config config.json
-"""
-
 from __future__ import annotations
 
 import argparse
