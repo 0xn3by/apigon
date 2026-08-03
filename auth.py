@@ -1,10 +1,3 @@
-"""Obtain a bearer token by logging into the target API.
-
-apigon never mints tokens itself — it POSTs credentials to the API's login
-endpoint and reads back whatever token the server issues, so you don't have to
-copy-paste short-lived JWTs by hand.
-"""
-
 from __future__ import annotations
 
 from typing import Any
