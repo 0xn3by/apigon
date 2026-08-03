@@ -1,5 +1,3 @@
-"""HTTP client factory and request builders for apigon."""
-
 from __future__ import annotations
 
 from typing import Any, Callable
