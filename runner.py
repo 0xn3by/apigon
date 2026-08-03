@@ -1,5 +1,3 @@
-"""Wires config -> clients -> checks, and reports the result."""
-
 from __future__ import annotations
 
 from dataclasses import replace
