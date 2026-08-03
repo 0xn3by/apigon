@@ -1,10 +1,7 @@
 from __future__ import annotations
-
 from dataclasses import replace
 from typing import Any
-
 import httpx
-
 from auth import login
 from checks import (
     bfla_test,
