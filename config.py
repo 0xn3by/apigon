@@ -1,5 +1,3 @@
-"""Config model for apigon: typed specs loaded from JSON with ${ENV} support."""
-
 from __future__ import annotations
 
 import json
