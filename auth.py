@@ -31,6 +31,7 @@ def login(
     *,
     timeout: float,
     verify_tls: bool,
+    transport: httpx.BaseTransport | None = None,
 ) -> str:
     """POST credentials to the login endpoint and return the issued token."""
     with httpx.Client(
@@ -39,6 +40,7 @@ def login(
         verify=verify_tls,
         follow_redirects=True,
         headers={"Accept": "application/json"},
+        transport=transport,
     ) as client:
         resp = client.request(spec.method, spec.path, json=credentials)
     resp.raise_for_status()
