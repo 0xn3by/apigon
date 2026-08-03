@@ -188,7 +188,7 @@ def test_run_closes_clients_even_if_a_check_raises(monkeypatch):
     )
 
     def handler(request: httpx.Request) -> httpx.Response:
-        return httpx.Response(500, text="boom")
+        return httpx.Response(201, json={"error": "no id field returned"})
 
     import runner as runner_module
 
