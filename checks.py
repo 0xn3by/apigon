@@ -1,5 +1,3 @@
-"""Authorization checks. Each check probes a specific API vulnerability class."""
-
 from __future__ import annotations
 
 from typing import Any
