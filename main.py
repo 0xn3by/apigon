@@ -37,14 +37,14 @@ def main(argv: list[str] | None = None) -> int:
 
     try:
         config = Config.load(args.config)
-        result = run(config)
+        results = run(config)
     except (ValueError, KeyError, httpx.HTTPError, OSError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
 
-    report(result)
-    # Exit 1 on a finding so the tool is CI-friendly.
-    return 1 if result["is_vulnerable"] else 0
+    report(results)
+    # Exit 1 on any finding so the tool is CI-friendly.
+    return 1 if any(r["is_vulnerable"] for r in results) else 0
 
 
 if __name__ == "__main__":
