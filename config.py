@@ -117,6 +117,10 @@ class Config:
     create: RequestSpec
     fetch: RequestSpec
     login: LoginSpec | None = None
+    update: RequestSpec | None = None    # enables the BOLA-update check
+    delete: RequestSpec | None = None    # enables the BOLA-delete check
+    admin: RequestSpec | None = None     # enables the BFLA check
+    privileged_fields: dict[str, Any] | None = None  # enables the mass-assignment check
     timeout: float = 10.0
     verify_tls: bool = True
 
@@ -132,6 +136,10 @@ class Config:
                 credentials=d.get("credentials"),
             )
 
+        def _optional_spec(key: str) -> RequestSpec | None:
+            raw_spec = raw.get(key)
+            return RequestSpec(**raw_spec) if raw_spec else None
+
         try:
             login_raw = raw.get("login")
             return Config(
@@ -141,6 +149,10 @@ class Config:
                 create=RequestSpec(**raw["create"]),
                 fetch=RequestSpec(**raw["fetch"]),
                 login=LoginSpec(**login_raw) if login_raw else None,
+                update=_optional_spec("update"),
+                delete=_optional_spec("delete"),
+                admin=_optional_spec("admin"),
+                privileged_fields=raw.get("privileged_fields"),
                 timeout=float(raw.get("timeout", 10.0)),
                 verify_tls=bool(raw.get("verify_tls", True)),
             )
@@ -170,4 +182,9 @@ SAMPLE_CONFIG = {
     #   "user_a": {"auth": {"type": "bearer", "token": "${ATTACKER_TOKEN}"}}
     "create": {"method": "POST", "path": "/orders", "json": {"item": "demo"}},
     "fetch": {"method": "GET", "path": "/orders/{id}"},
+    # Everything below is optional; each key turns on one extra check.
+    # "update": {"method": "PATCH", "path": "/orders/{id}", "json": {"item": "pwned"}},
+    # "delete": {"method": "DELETE", "path": "/orders/{id}"},
+    # "admin": {"method": "GET", "path": "/admin/users"},
+    # "privileged_fields": {"role": "admin"},
 }
