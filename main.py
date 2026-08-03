@@ -1,11 +1,8 @@
 from __future__ import annotations
-
 import argparse
 import json
 import sys
-
 import httpx
-
 from config import SAMPLE_CONFIG, Config
 from runner import report, run
 
