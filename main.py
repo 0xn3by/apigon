@@ -6,8 +6,37 @@ import httpx
 from config import SAMPLE_CONFIG, Config
 from runner import report, run
 
+_BANNER_ART = r"""
+ ███   ████   █████   ███    ███   █   █
+█   █  █   █    █    █   █  █   █  ██  █
+█   █  █   █    █    █      █   █  █ █ █
+█████  ████     █    █  ██  █   █  █ █ █
+█   █  █        █    █   █  █   █  █  ██
+█   █  █        █    █   █  █   █  █   █
+█   █  █      █████   ████   ███   █   █
+"""
+
+_SHORTCUTS = """\
+  -c, --config <path>    run every check the config enables
+  --init-config <path>   write a starter config and exit
+  ctrl+c                 abort mid-run
+  exit codes             0 clean  1 vulnerable  2 error"""
+
+
+def _print_banner() -> None:
+    color = sys.stdout.isatty()
+    green, cyan, dim, bold, reset = (
+        ("\033[92m", "\033[96m", "\033[2m", "\033[1m", "\033[0m") if color else ("", "", "", "", "")
+    )
+    print(f"{green}{bold}{_BANNER_ART}{reset}")
+    print(f"{cyan}  API authorization (BOLA / BFLA / mass-assignment) testing CLI{reset}")
+    print(f"{dim}  ---------------------------------------------------------------{reset}")
+    print(f"{dim}{_SHORTCUTS}{reset}")
+    print(f"{dim}  ---------------------------------------------------------------{reset}\n")
+
 
 def main(argv: list[str] | None = None) -> int:
+    _print_banner()
     parser = argparse.ArgumentParser(prog="apigon", description="API BOLA authorization tester")
     parser.add_argument("-c", "--config", help="path to JSON config file")
     parser.add_argument("--init-config", metavar="PATH", help="write a starter config to PATH and exit")
