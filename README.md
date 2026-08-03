@@ -12,7 +12,7 @@ Apigon helps answer one question quickly: can one authenticated user read, modif
 - Owner-side verification to reduce false positives from soft-404 or no-op APIs.
 - Non-zero exit code on findings, so it fits directly into CI.
 
-![Terminal demo](assets/demo-terminal.svg)
+![Terminal demo](assets/demo-terminal.png)
 
 ## Problem Statement
 
