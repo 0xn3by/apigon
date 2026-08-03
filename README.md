@@ -1,4 +1,4 @@
-# apigon
+# Apigon — API Authorization Testing CLI
 
 A Python CLI that detects common API authorization flaws by exercising real endpoints as two authenticated users and verifying the result from the owner's perspective.
 
