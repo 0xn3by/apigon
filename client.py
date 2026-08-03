@@ -1,9 +1,6 @@
 from __future__ import annotations
-
 from typing import Any, Callable
-
 import httpx
-
 from config import RequestSpec, UserSpec
 
 # A callable that asks a client to create an object and returns the raw response.
