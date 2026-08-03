@@ -1,32 +1,51 @@
 # apigon
 
-An API authorization (BOLA/BFLA/mass-assignment) testing CLI written in Python using `httpx`, differential response comparison, and a JSON-driven check config.
+A Python CLI that detects common API authorization flaws by exercising real endpoints as two authenticated users and verifying the result from the owner's perspective.
 
-[![Build](https://img.shields.io/badge/build-passing-brightgreen)](https://github.com/0xn3by/apigon)
+[![Tests](https://github.com/0xn3by/apigon/actions/workflows/tests.yml/badge.svg)](https://github.com/0xn3by/apigon/actions/workflows/tests.yml)
 [![Python Version](https://img.shields.io/badge/python-3.10%2B-3776AB?logo=python)](https://www.python.org/)
 [![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-78%20passing-brightgreen)](tests/)
 
-## Overview
+Apigon helps answer one question quickly: can one authenticated user read, modify, or delete another user's data, or reach privileged API functionality they should not have.
 
-- Logs in as two distinct users (attacker/low-priv and victim/high-priv) and drives every check through their authenticated `httpx` clients
-- Runs a BOLA read check by default; update, delete, BFLA, and mass-assignment checks turn on automatically when their config keys are present
-- Resolves the "oracle problem" for BOLA detection by diffing the attacker's response against the resource owner's own ground-truth view, instead of trusting a bare `200 + id-match`
-- Confirms update/delete attacks by re-fetching the object as its owner and diffing before/after state, so a `200 OK` that silently no-ops isn't reported as a false positive
-- Fetches fresh bearer tokens at runtime via a configurable login endpoint, or accepts pre-issued tokens/headers/cookies directly
-- Reads secrets from `${ENV_VAR}` placeholders (with `.env` support) so credentials never live in the config file
-- Exits non-zero on any finding, making it a CI-friendly authorization regression gate
+- Two authenticated users: one victim, one low-privileged attacker.
+- Owner-side verification to reduce false positives from soft-404 or no-op APIs.
+- Non-zero exit code on findings, so it fits directly into CI.
+
+![Terminal demo](assets/demo-terminal.svg)
+
+## Problem Statement
+
+API authorization flaws are difficult to detect because a `200 OK` is not enough evidence. Many APIs return placeholder data for invalid object IDs, silently ignore writes, or expose behavior that looks successful from the attacker's side only.
+
+Apigon uses two authenticated users because object-level authorization is inherently relational: the tool needs one user to create or own the resource, and a different low-privileged user to attempt access against that same resource.
+
+Owner-side verification reduces false positives by checking the target resource from the victim's perspective before and after the attack. That makes soft-404 responses, echoed IDs, and fake-success update or delete responses much less likely to be reported as real vulnerabilities.
+
+## Security And Responsible Use
+
+- Authorized targets only.
+- Update and delete checks can modify or remove data.
+- Prefer staging environments and disposable test accounts.
+- Review each configured endpoint before running against anything shared or production-like.
+
+## Detection Workflow
+
+```text
+Authenticate users
+  -> create owner resource
+  -> test as low-privileged user
+  -> verify as owner
+  -> report result
+```
 
 ## Key Features
 
-- `_leak_confirmed()` cross-checks the attacker's JSON body against the owner's own fetch of the same object — exact dict equality is the strong signal; a bare `id` match is only used as a fallback when the owner has no self-read path
-- `bola_update_test()` / `bola_delete_test()` fetch the object as its owner before and after the attack and compare state, catching APIs that return a success status without actually applying the mutation
-- `bfla_test()` hits a configured admin/privileged endpoint with the low-privilege client and flags a `200` as broken function-level authorization
-- `mass_assignment_test()` injects extra fields (e.g. `role: admin`) into the create payload and reports exactly which fields the server echoed back as accepted
-- `AuthSpec.apply()` supports `bearer`, `header`, and `cookie` auth, raising `ValueError` on an unrecognized type instead of silently sending an unauthenticated request
-- `login()` digs a token out of any JSON response shape via a dot-path (e.g. `data.token`) so apigon never has to mint or hardcode a JWT itself
-- `resolve_env()` recursively substitutes `${VAR}` placeholders through the whole config tree; a missing variable is a hard `KeyError`, never a silently empty credential
-- Every HTTP-facing function (`build_client`, `login`, `run`) accepts an injectable `transport`, so the full request pipeline is unit-testable against `httpx.MockTransport` with zero network calls
+- BOLA read detection compares the attacker's response with the owner's real view of the same object.
+- Update and delete checks verify the object's state after the attack instead of trusting status codes.
+- BFLA checks probe restricted endpoints with the low-privileged user.
+- Mass-assignment checks inject privileged fields and report only fields the server actually accepted.
+- Login, client construction, and runner flow all support injectable `httpx.MockTransport` testing.
 
 ## Tech Stack
 
@@ -62,41 +81,7 @@ python3 -m venv .venv
 .venv/bin/python main.py --config config.json
 ```
 
-## Configuration
-
-apigon is entirely config-driven — no check-specific CLI flags. Everything lives in the JSON file passed via `--config`.
-
-```
-base_url            Target API base URL (required)
-timeout             Request timeout in seconds (default: 10)
-verify_tls          Verify TLS certificates (default: true)
-login               { method, path, token_field } — POST credentials and dig a token out of the response (optional)
-user_a              Attacker identity: `auth` (existing token/header/cookie) or `credentials` (used with `login`)
-user_b              Victim identity: same shape as user_a
-create              RequestSpec to create an object as the victim (required)
-fetch               RequestSpec to fetch an object by id — `{id}` is substituted (required)
-update              RequestSpec — presence alone enables the BOLA-update check (optional)
-delete              RequestSpec — presence alone enables the BOLA-delete check (optional)
-admin                RequestSpec — presence alone enables the BFLA check (optional)
-privileged_fields    dict of fields to inject into `create` — presence alone enables the mass-assignment check (optional)
-```
-
-**Notes**
-
-- `base_url`, `user_a`, `user_b`, `create`, and `fetch` are the only required keys — `bola_read` always runs off of them
-- Any string value may reference `${ENV_VAR}`; apigon also auto-loads a `.env` file from the project directory (real environment variables always take precedence)
-- A referenced `${ENV_VAR}` that isn't set raises a hard error at load time rather than sending an empty credential
-- Exit code is `1` if any check finds a vulnerability, `0` if every check is clean, `2` on a config or network error
-
-## Usage Examples
-
-Generate a starter config:
-
-```bash
-python main.py --init-config config.json
-```
-
-Run with tokens you already have:
+## Minimal Configuration
 
 ```json
 {
@@ -104,51 +89,75 @@ Run with tokens you already have:
   "user_a": { "auth": { "type": "bearer", "token": "${ATTACKER_TOKEN}" } },
   "user_b": { "auth": { "type": "bearer", "token": "${VICTIM_TOKEN}" } },
   "create": { "method": "POST", "path": "/orders", "json": { "item": "demo" } },
-  "fetch":  { "method": "GET", "path": "/orders/{id}" }
+  "fetch": { "method": "GET", "path": "/orders/{id}" }
 }
 ```
 
-Run with the login flow so apigon fetches fresh tokens itself:
+## Configuration Options
 
-```json
-{
-  "base_url": "https://api.example.com",
-  "login": { "method": "POST", "path": "/auth/login", "token_field": "access_token" },
-  "user_a": { "credentials": { "email": "${ATTACKER_EMAIL}", "password": "${ATTACKER_PASSWORD}" } },
-  "user_b": { "credentials": { "email": "${VICTIM_EMAIL}", "password": "${VICTIM_PASSWORD}" } },
-  "create": { "method": "POST", "path": "/orders", "json": { "item": "demo" } },
-  "fetch":  { "method": "GET", "path": "/orders/{id}" }
-}
-```
+| Key | Required | Purpose |
+| --- | --- | --- |
+| `base_url` | Yes | Target API base URL. |
+| `timeout` | No | Request timeout in seconds. Default: `10`. |
+| `verify_tls` | No | Enable TLS certificate verification. Default: `true`. |
+| `login` | No | Login request spec used to exchange credentials for a token. |
+| `user_a` | Yes | Low-privileged attacker identity. |
+| `user_b` | Yes | Victim or owner identity. |
+| `create` | Yes | Request spec used to create the owner's resource. |
+| `fetch` | Yes | Request spec used to read the resource by `{id}`. |
+| `update` | No | Enables the BOLA update check when present. |
+| `delete` | No | Enables the BOLA delete check when present. |
+| `admin` | No | Enables the BFLA check when present. |
+| `privileged_fields` | No | Enables mass-assignment checks when present. |
 
-Enable every check (update, delete, BFLA, mass assignment) on top of the base config:
-
-```json
-{
-  "update": { "method": "PATCH", "path": "/orders/{id}", "json": { "item": "pwned" } },
-  "delete": { "method": "DELETE", "path": "/orders/{id}" },
-  "admin": { "method": "GET", "path": "/admin/users" },
-  "privileged_fields": { "role": "admin" }
-}
-```
-
-Use the exit code in CI:
+Generate a starter file:
 
 ```bash
-python main.py --config config.json || echo "authorization findings detected"
+python main.py --init-config config.json
+```
+
+Notes:
+- `base_url`, `user_a`, `user_b`, `create`, and `fetch` are the only required keys.
+- `${ENV_VAR}` placeholders are resolved recursively, with optional `.env` loading.
+- Exit code is `1` on findings, `0` when clean, and `2` on config or network errors.
+
+## Example Output
+
+```bash
+$ python main.py --config config.json
+apigon - authorization test results
+----------------------------------------
+[bola_read] VULNERABLE
+    target_id: 41
+    create_status: 201
+    attack_status: 200
+[bola_update] not vulnerable
+    target_id: 41
+    attack_status: 403
+[bfla] VULNERABLE
+    attack_status: 200
+----------------------------------------
+overall verdict: VULNERABLE
+$ echo $?
+1
 ```
 
 ## Testing
 
-The whole suite runs against `httpx.MockTransport` fakes — no live API, no network calls.
-
 ```bash
-python3 -m venv .venv
-.venv/bin/pip install -r requirements-dev.txt
-.venv/bin/python -m pytest -v
+python -m pytest
 ```
 
-`tests/test_runner.py` is the most informative file: it stands up an in-memory "vulnerable" API (no ownership checks at all) and a "secure" API (ownership and role checks enforced) and asserts apigon flags every check against the first and stays clean against the second — the regression test for false positives.
+The suite runs against `httpx.MockTransport`, so no live API is required.
+
+## CI Usage
+
+Use the process exit code directly so findings fail the pipeline:
+
+```yaml
+- name: Run Apigon
+  run: python main.py --config config.json
+```
 
 ## Core Modules
 
@@ -207,11 +216,11 @@ apigon/
 
 ## Current Limitations
 
-- No object-id range or enumeration brute-forcing — each check probes exactly one freshly created object, not a swept range of ids
-- No retry or backoff logic — a `429`/`5xx` from the target is reported as-is rather than retried
-- Checks run sequentially, one HTTP round-trip at a time — no concurrency
-- Assumes `create` responses return an `id` field in the JSON body; APIs that key objects differently aren't supported out of the box
-- The BFLA check only probes a single configured endpoint per run, not a set of role-restricted routes
+- Each run probes one freshly created object, not a broad object-ID search space.
+- No retry or backoff behavior for unstable targets.
+- Checks run sequentially.
+- `create` responses must expose an `id` field in JSON.
+- BFLA currently tests one configured privileged endpoint per run.
 
 ## License
 
